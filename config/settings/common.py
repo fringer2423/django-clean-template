@@ -15,6 +15,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'apps.core.apps.CoreConfig'
 ]
 
 MIDDLEWARE = [
@@ -99,3 +101,7 @@ CACHES = {
         }
     }
 }
+
+AUTH_USER_MODEL = 'core.User'
+
+PROJECT_NAME = os.environ.get('PROJECT_NAME', 'Django')
