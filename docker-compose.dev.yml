@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./
+    container_name: backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./ENV/.env.common
+      - ./ENV/.env.dev
+    healthcheck:
+      test: curl --fail http://localhost:8000 || exit 1
+      interval: 10s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    depends_on:
+      - redis
+
+  redis:
+    container_name: redis
+    image: redis:alpine
+
+  redis-caches:
+    container_name: redis-caches
+    image: redis:alpine
+
+  redis-commander:
+    container_name: redis-commander
+    hostname: redis-commander
+    image: rediscommander/redis-commander:latest
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+
+  celery:
+    build: ./
+    command: celery -A config worker -Q notification
+    volumes:
+      - ./:/app
+    env_file:
+      - ./ENV/.env.common
+      - ./ENV/.env.dev
+    depends_on:
+      - backend
+      - redis
+
+  celery-fast:
+    build: ./
+    command: celery -A config worker
+    container_name: 'celery_fast_tasks'
+    volumes:
+      - ./:/app
+    env_file:
+      - ./ENV/.env.common
+      - ./ENV/.env.dev
+    depends_on:
+      - backend
+      - redis
+
+  celery-beat:
+    build: ./
+    command: celery -A config beat
+    container_name: 'celery_beat'
+    volumes:
+      - ./:/app
+    env_file:
+      - ./ENV/.env.common
+      - ./ENV/.env.dev
+    depends_on:
+      - backend
+      - redis
+
+  flower:
+    build: ./
+    command: celery flower -A config --port=5555 --broker=redis://redis:6379/0
+    container_name: 'flower'
+    ports:
+      - "5555:5555"
+    env_file:
+      - ./ENV/.env.common
+      - ./ENV/.env.dev
+    depends_on:
+      - backend
+      - redis
+      - celery

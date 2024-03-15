@@ -1,0 +1,44 @@
+version: "3.7"
+services:
+
+  traefik:
+    image: traefik:latest
+    container_name: 'traefik'
+    command:
+      - --entryPoints.web.address=:80
+      - --entryPoints.websecure.address=:443
+      - --providers.docker=true
+      - --providers.docker.endpoint=unix:///var/run/docker.sock
+      - --providers.docker.exposedByDefault=false
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.email=${LE_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json
+      - --metrics.prometheus=true"
+      - --metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+      - --global.checkNewVersion=true
+      - --global.sendAnonymousUsage=false
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      # Configure dashboard
+      - --api.dashboard=true
+      - --api.insecure=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./../www-files/traefik-certificates:/etc/traefik/acme
+    ports:
+      - "80:80"
+      - "443:443"
+    labels:
+      - traefik.enable=true
+      # https
+      - traefik.http.routers.traefik.rule=Host(`monitor.${DOMAIN}`)
+      - traefik.http.routers.traefik.service=traefik
+      - traefik.http.routers.traefik.entrypoints=websecure
+      - traefik.http.services.traefik.loadbalancer.server.port=8080
+      - traefik.http.services.traefik.loadbalancer.passhostheader=true
+      - traefik.http.routers.traefik.tls=true
+      - traefik.http.routers.traefik.tls.certresolver=le
+      # Настройки BasicAuth, если необходимо отключить просто комментируем 2 строчки ниже
+      - traefik.http.routers.traefik.middlewares=stage-auth
+      - traefik.http.middlewares.stage-auth.basicauth.users=admin:$$apr1$$zhygvMlE$$L5EH1mc.wm/Ak3sA8/rgO.
+    restart: unless-stopped

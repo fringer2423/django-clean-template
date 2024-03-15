@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./
+    container_name: 'backend'
+    command: gunicorn -w 4 --worker-tmp-dir /dev/shm config.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - ./:/app
+    env_file:
+      - .env.prod
+    labels:
+      - traefik.enable=true
+      # https
+      - traefik.http.routers.backend.rule=Host(`${DOMAIN}`, `www.${DOMAIN}`)
+      - traefik.http.routers.backend.service=backend
+      - traefik.http.routers.backend.entrypoints=websecure
+      - traefik.http.services.backend.loadbalancer.server.port=8000
+      - traefik.http.services.backend.loadbalancer.passhostheader=true
+      - traefik.http.routers.backend.tls=true
+      - traefik.http.routers.backend.tls.certresolver=le
+      # Настройки BasicAuth, если необходимо отключить просто комментируем 2 строчки ниже
+#      - traefik.http.routers.dev-docs.middlewares=stage-auth
+#      - traefik.http.middlewares.stage-auth.basicauth.users=ab_team:$$2y$$05$$lDID4X51b2v1amO2UTpw2.R6blrfiEpu5WOHIn2n01Mm2lpGmk0Mm/
+    restart: unless-stopped
+
+
+  redis:
+    container_name: 'redis'
+    image: redis:alpine
+
+  redis-caches:
+    container_name: 'redis-caches'
+    image: redis:alpine
+
+  redis-commander:
+    container_name: 'redis-commander'
+    hostname: redis-commander
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    labels:
+      - traefik.enable=true
+      # https
+      - traefik.http.routers.redis-commander.rule=Host(`redis-commander.${DOMAIN}`)
+      - traefik.http.routers.redis-commander.service=redis-commander
+      - traefik.http.routers.redis-commander.entrypoints=websecure
+      - traefik.http.services.redis-commander.loadbalancer.server.port=8081
+      - traefik.http.services.redis-commander.loadbalancer.passhostheader=true
+      - traefik.http.routers.redis-commander.tls=true
+      - traefik.http.routers.redis-commander.tls.certresolver=le
+      # Настройки BasicAuth, если необходимо отключить просто комментируем 2 строчки ниже
+      - traefik.http.routers.redis-commander.middlewares=redis-commander-auth
+      - traefik.http.middlewares.redis-commander-auth.basicauth.users=admin:$$apr1$$zhygvMlE$$L5EH1mc.wm/Ak3sA8/rgO.
+    restart: unless-stopped
+
+  celery:
+    build: ./
+    container_name: 'celery_main'
+    command: celery -A config worker
+    volumes:
+      - ./:/app
+    env_file:
+      - .env.prod
+
+  celery-beat:
+    build: ./
+    command: celery -A config beat
+    container_name: 'celery_beat'
+    volumes:
+      - ./:/app
+    env_file:
+      - .env.prod
+
+  flower:
+    build: ./
+    command: celery flower -A config --port=5555 --broker=redis://redis:6379/0
+    container_name: 'flower'
+    env_file:
+      - .env.prod
+    labels:
+      - traefik.enable=true
+      # https
+      - traefik.http.routers.flower.rule=Host(`flower.${DOMAIN}`)
+      - traefik.http.routers.flower.service=flower
+      - traefik.http.routers.flower.entrypoints=websecure
+      - traefik.http.services.flower.loadbalancer.server.port=5555
+      - traefik.http.services.flower.loadbalancer.passhostheader=true
+      - traefik.http.routers.flower.tls=true
+      - traefik.http.routers.flower.tls.certresolver=le
+      # Настройки BasicAuth, если необходимо отключить просто комментируем 2 строчки ниже
+      - traefik.http.routers.flower.middlewares=flower-auth
+      - traefik.http.middlewares.flower-auth.basicauth.users=admin:$$apr1$$zhygvMlE$$L5EH1mc.wm/Ak3sA8/rgO.
+    restart: unless-stopped
+

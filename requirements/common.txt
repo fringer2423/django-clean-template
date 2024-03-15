@@ -1,0 +1,10 @@
+celery==5.3.6
+django==5.0.3
+django-storages==1.14.2
+django-redis==5.4.0
+django-robots==6.1
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+flower==2.0.1
+Pillow==10.2.0
+psycopg==3.1.18
